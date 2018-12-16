@@ -65,7 +65,7 @@ class surveyRelationship extends \LimeSurvey\PluginManager\PluginBase
 
     public function exportData($msid,$ssid,$micode,$sicode){
         
-        $mainDatas = $this->exportMainData($msid)
+        $mainDatas = $this->exportMainData($msid);
         foreach($mainDatas as $mainData){
             exportSlaveData($mainData);
         }
@@ -74,7 +74,7 @@ class surveyRelationship extends \LimeSurvey\PluginManager\PluginBase
     public function exportMainData($sid){
         $sQuery = 'SELECT * FROM lime_survey_'.$msid ;
         $mainDatas = Yii::app()->db->createCommand($sQuery)->queryAll();
-        return $mainDatas
+        return $mainDatas;
     }
 
     public function exportSlaveData($sid,$sicode){
