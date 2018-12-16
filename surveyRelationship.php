@@ -10,6 +10,7 @@ class surveyRelationship extends \LimeSurvey\PluginManager\PluginBase
 {
     static protected $description = 'Support multi-questionnaire Relation Management Function';
     static protected $name = 'surveyRelationship';
+    static protected $exportData=[];
 
     protected $storage = 'DbStorage';
     /**
@@ -42,63 +43,50 @@ class surveyRelationship extends \LimeSurvey\PluginManager\PluginBase
     public function actionIndex()
     {
         $sAjaxBaseUrl = "pluginhelper?sa=ajax&plugin=".$this->getName()."&method=";
-        $aRelationships = $this->getRelationship();
-        $aSetedSurvey = $this->getSetedSurvey($aRelationships);
-        
-        $aData["addUrl"] = $sAjaxBaseUrl."add";
-        $aData["deleteUrl"] = $sAjaxBaseUrl."delete";
-        ///
-        $criteria = new CDbCriteria();
-        $criteria->addNotInCondition("sid",$aSetedSurvey);
-        $aData["surveys"] = Survey::model()->findAll($criteria);
-        ///
-        $aData["relation"] = $this->get($aRelationships);
+        $aData["exportUrl"] = $sAjaxBaseUrl."export";
+        $aData["surveys"] = Survey::model()->findAll();
         return $this->renderPartial('index',$aData, true);
     }
+    public function export(){
+        $mSid = app()->request->getPost('master');
+        $sSid = app()->request->getPost('slave');
+        $mainIndexCode = $this->getMainIndexCode($mSid);
+        $salveIndexCode = $this->getMainIndexCode($sSid);
+        $this->exportData($mSid,$sSid,$mainIndexCode,$salveIndexCode);
 
-
-
-    public function add(){
-        $master = Yii::app()->request->getParam('master');
-        $slaves = Yii::app()->request->getParam('slave');
-        $this->addRelationship($master,$slaves);
-        Yii::app()->getRequest()->redirect($this->getUrl());
     }
 
-    public function get($aRelationships){
-        $aResult = [];
-        foreach($aRelationships as $aRelationship){
-            if($aRelationship["masterId"] == $aRelationship["slaveId"]){
-                continue ;
-            }
-            $aResult[$aRelationship["masterId"]]["msruvey"] = Survey::model()->findByPk($aRelationship["masterId"]);
-            $aResult[$aRelationship["masterId"]]["ssruvey"][] = Survey::model()->findByPk($aRelationship["slaveId"]);
-        }
-        return $aResult;
-    }
+    /**
+     * msid 主问卷id
+     * ssid 子文卷id
+     * micode 主问卷关联问题编号
+     * sicode 子文卷关联问题编号
+     */
 
-    private function addRelationship($master,$slaves){
-        foreach($slaves as $slave){
-            $model = $this->api->newModel($this,"survey_relationship");
-            $model->masterId = $master;
-            $model->slaveId = $slave;
-            $model->save();
+    public function exportData($msid,$ssid,$micode,$sicode){
+        
+        $mainDatas = $this->exportMainData($msid)
+        foreach($mainDatas as $mainData){
+            exportSlaveData($mainData);
         }
     }
-    
-    public function getRelationship(){
-        $sQuery = 'SELECT * FROM {{surveyRelationship_survey_relationship}}';
-        $aRelationships = Yii::app()->db->createCommand($sQuery)->query()->readAll();
-        return $aRelationships;
+
+    public function exportMainData($sid){
+        $sQuery = 'SELECT * FROM lime_survey_'.$msid ;
+        $mainDatas = Yii::app()->db->createCommand($sQuery)->queryAll();
+        return $mainDatas
     }
 
-    public function getSetedSurvey($aRelationships){
-        $result = [];
-        foreach($aRelationships as $aRelationship){
-            $result[] = $aRelationship["masterId"];
-            $result[] = $aRelationship["slaveId"];
-        }
-        return array_unique($result);
+    public function exportSlaveData($sid,$sicode){
+
+    }
+
+    public function getMainIndexCode($sid){
+        $sMainQuestion = "请问医生编号是什么?";
+        $sQuery = 'SELECT * FROM {{questions}} where sid=:sid and question=:question';
+        $mainIndexCode = Yii::app()->db->createCommand($sQuery)->bindValues(array(':sid'=>$sid, ':question'=>$sMainQuestion))->queryRow();
+        if(!$mainIndexCode) return null;
+        return $sid."X".$mainIndexCode["gid"]."X".$mainIndexCode["qid"];
     }
 
 
@@ -114,12 +102,4 @@ class surveyRelationship extends \LimeSurvey\PluginManager\PluginBase
         );
     }
 
-
-    private function createTable(){
-        $this->api->createTable($this,"survey_relationship",[
-            'id' => "pk",
-            'masterId' => "int",
-            'slaveId' => "int"
-        ]);
-    }
 }
